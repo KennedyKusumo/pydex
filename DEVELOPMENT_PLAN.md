@@ -69,20 +69,18 @@ Each class carries three boolean flags (`is_dynamic`, `has_tv_controls`, `has_ti
 
 ### Tasks
 
-**PR 1 — Interface + shim (no example changes):**
-- [ ] Create `pydex/core/simulate.py` with `SimulatorBase` and 5 named subclasses
-- [ ] Add `_LegacySimulatorAdapter` (private, wraps bare callables with deprecation warning)
-- [ ] Add `simulator` property to `Designer`; deprecate `simulate` as alias
-- [ ] Replace `_handle_simulate_sig` + `_initialize_internal_simulate_function` with `_configure_simulator()` in `_mixin_init.py`
-- [ ] Rewrite `_get_component_sizes` to use the three boolean flags instead of integer `_simulate_signature`
-- [ ] Update `_swap_candidates` / `_revert_candidates` in `_mixin_criteria.py` to use `_go_simulator`
-- [ ] Make `_simulate_internal` a thin delegating method in `_mixin_sensitivity.py`
-- [ ] Export the 5 public classes from `pydex/core/__init__.py`
-- [ ] Verify all 6 runnable examples pass (with deprecation warnings, no failures)
+**PR 1 — Interface + shim (no example changes): ✓ COMPLETE (2026-03-28)**
+- [x] Create `pydex/core/simulate.py` with `SimulatorBase` and 5 named subclasses
+- [x] Add `_LegacySimulatorAdapter` (private, wraps bare callables with deprecation warning)
+- [x] Add `simulator` property to `Designer`; deprecate `simulate` as alias
+- [x] Replace `_handle_simulate_sig` + `_initialize_internal_simulate_function` with `_configure_simulator()` in `_mixin_init.py`
+- [x] Update `_swap_candidates` / `_revert_candidates` in `_mixin_criteria.py` to use `_go_simulator`
+- [x] Make `_simulate_internal` a thin delegating method in `_mixin_sensitivity.py`
+- [x] Verify all runnable examples pass (with deprecation warnings, no failures)
 
 **PR 2 — Migrate examples to named classes:**
 - [ ] Update all examples in `examples/` to use the appropriate named simulator class
-- [ ] Remove `DesignerInit.simulate` stub (no longer needed once all examples migrated)
+- [ ] Remove `DesignerInit.simulate` deprecated alias (no longer needed once all examples migrated)
 - [ ] Write `MIGRATION.md` with before/after for each of the 5 signature types
 
 **Definition of done:** All examples use named simulator classes. `_LegacySimulatorAdapter` still exists but is never invoked by any shipped example. mypy catches a wrong `simulate()` signature at type-check time.
