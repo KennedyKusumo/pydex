@@ -720,36 +720,7 @@ class DesignerSensitivity:
         return self.response
 
     def _simulate_internal(self, ti_controls, tv_controls, theta, sampling_times):
-        raise SyntaxError(
-            "Make sure you have initialized the designer, and specified the simulate "
-            "function correctly."
-        )
-
-    def _initialize_internal_simulate_function(self):
-        if self._simulate_signature == 1:
-            self._simulate_internal = (  # type: ignore[method-assign]
-                lambda tic, tvc, mp, spt: self.simulate(tic, mp)
-            )
-        elif self._simulate_signature == 2:
-            self._simulate_internal = (  # type: ignore[method-assign]
-                lambda tic, tvc, mp, spt: self.simulate(tic, spt, mp)
-            )
-        elif self._simulate_signature == 3:
-            self._simulate_internal = (  # type: ignore[method-assign]
-                lambda tic, tvc, mp, spt: self.simulate(tvc, spt, mp)
-            )
-        elif self._simulate_signature == 4:
-            self._simulate_internal = (  # type: ignore[method-assign]
-                lambda tic, tvc, mp, spt: self.simulate(tic, tvc, spt, mp)
-            )
-        elif self._simulate_signature == 5:
-            self._simulate_internal = (  # type: ignore[method-assign]
-                lambda tic, tvc, mp, spt: self.simulate(spt, mp)
-            )
-        else:
-            raise SyntaxError(
-                'Cannot initialize simulate function properly, check your syntax.'
-            )
+        return self._simulator(ti_controls, tv_controls, theta, sampling_times)
 
     def _transform_efforts(self):
         if self._unconstrained_form:

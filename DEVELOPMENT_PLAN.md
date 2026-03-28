@@ -2,13 +2,13 @@
 
 ## Goal
 
-Bring pydex to a state that reflects the current author's standards: clean architecture, modern Python, well-tested, publishable. The approach is incremental — each phase leaves the project better without breaking the existing API for users.
+Bring pydex to a state that reflects my current standards: clean architecture, modern Python, well-tested, publishable. The approach is incremental — each phase leaves the project better without breaking the existing API for users.
 
 ---
 
 ## Phase 1 — Type Hints + Static Analysis
 
-**Why first:** Type hints are the scaffolding for everything else. They make refactoring safer, expose hidden assumptions, and give IDEs and mypy visibility into the codebase. This phase touches every file but doesn't change behavior.
+**Why first:** Type hints are the scaffolding for everything else. They make refactoring safer, expose hidden assumptions, and give IDEs and mypy visibility into the codebase. This phase touches every file but doesn't change behaviour.
 
 **Tasks:**
 - [x] Add type hints to all public methods in `designer.py`
@@ -24,49 +24,68 @@ Bring pydex to a state that reflects the current author's standards: clean archi
 
 ---
 
-## Phase 2 — Decompose Designer into Focused Classes
+## Phase 2 — Decompose Designer into Focused Classes ✓
 
 **Why second:** The 5,390-line God class is the root cause of most maintainability problems. Splitting it out makes testing, documentation, and future development tractable. Type hints from Phase 1 make this refactor safer.
 
-**Proposed decomposition:**
+**Result:** `designer.py` reduced from 5,390 → 1,221 lines across 9 focused mixin modules:
 
-| New Class / Module | Responsibility | Extracted from |
-|---|---|---|
-| `designer.py` (slimmed) | Orchestration, user interface, state management | Existing Designer |
-| `criteria.py` | All optimality criteria (D, A, E, CVaR, prediction-oriented, pseudo-Bayesian) | Designer.d_opt_criterion, etc. |
-| `sensitivity.py` | Sensitivity computation, FIM assembly, atomic FIMs | Designer.eval_sensitivities, eval_fim, etc. |
-| `estimation.py` | Parameter estimation (least-squares, MCMC/emcee) | Designer.estimate_parameters, insilico_bayesian_inference |
-| `estimability.py` | Parameter estimability analysis | Designer.estimability_study, etc. |
-| `visualization.py` | All plot_* methods | Designer.plot_* (20+ methods) |
-| `apportionment.py` | Apportion continuous design to integer experiments | Designer.apportion |
-| `io.py` | Save/load results (dill-based) | Designer.write_oed_result, load_oed_result |
+| Mixin | Responsibility |
+|---|---|
+| `_mixin_init.py` — `DesignerInit` | Properties, `initialize`, candidate enumeration, init validation |
+| `_mixin_io.py` — `DesignerIO` | Logging, load/save, result paths |
+| `_mixin_criteria.py` — `DesignerCriteria` | D/A/E, prediction-oriented, CVaR criteria |
+| `_mixin_visualization.py` — `DesignerVisualization` | All plot methods |
+| `_mixin_apportionment.py` — `DesignerApportionment` | `apportion`, Adams algorithm |
+| `_mixin_estimability.py` — `DesignerEstimability` | Estimability study, normalize sensitivities |
+| `_mixin_estimation.py` — `DesignerEstimation` | `estimate_parameters`, Bayesian PE, residuals |
+| `_mixin_sensitivity.py` — `DesignerSensitivity` | Simulate, FIM, sensitivities |
+| `_mixin_candidates.py` — `DesignerCandidates` | `get_optimal_candidates`, effort filtering |
 
-**Tasks:**
-- [ ] Extract criteria methods → `criteria.py`
-- [ ] Extract sensitivity/FIM methods → `sensitivity.py`
-- [ ] Extract visualization → `visualization.py`
-- [ ] Extract estimation → `estimation.py`
-- [ ] Extract estimability → `estimability.py`
-- [ ] Extract apportionment → `apportionment.py`
-- [ ] Extract IO → `io.py`
-- [ ] Slim down Designer to orchestration only
-- [ ] Ensure all existing examples still run (integration test gate)
-
-**Definition of done:** No single module exceeds ~500 lines. All examples pass.
+**Definition of done:** ✓ All 6 runnable examples pass. `designer.py` contains only `__init__`, `design_experiment`, `solve_cvar_problem`, and their private formulation helpers.
 
 ---
 
 ## Phase 3 — Proper `simulate()` Interface
 
-**Why:** The current monkey-patch pattern (`designer.simulate = my_function`) is unidiomatic, breaks IDE support, and makes errors hard to trace. Replace with a Protocol or ABC that users can implement clearly.
+**Why:** The current pattern (`designer.simulate = my_function`) is unidiomatic, breaks IDE support, and makes errors hard to trace. Replacing it with an ABC makes the contract explicit and statically verifiable, and eliminates the fragile signature-sniffing in `_handle_simulate_sig`.
 
-**Tasks:**
-- [ ] Define `SimulateProtocol` (or abstract base) with typed signature
-- [ ] Support both subclassing and callable assignment (backwards compatibility)
-- [ ] Update all examples to use the new interface
-- [ ] Document migration path
+### Design
 
-**Definition of done:** Users can subclass `Designer` with a typed `simulate()` method and get full IDE completion.
+**New file: `pydex/core/simulate.py`** — an ABC hierarchy with one class per system type:
+
+| Class | User signature | System type |
+|---|---|---|
+| `SimulatorBase` | abstract `__call__(tic, tvc, mp, spt)` | base |
+| `StaticSimulator` | `simulate(ti_controls, model_parameters)` | static, TI controls |
+| `DynamicTISimulator` | `simulate(ti_controls, sampling_times, model_parameters)` | dynamic, TI only |
+| `DynamicTVSimulator` | `simulate(tv_controls, sampling_times, model_parameters)` | dynamic, TV only |
+| `DynamicFullSimulator` | `simulate(ti_controls, tv_controls, sampling_times, model_parameters)` | dynamic, both |
+| `DynamicUncontrolledSimulator` | `simulate(sampling_times, model_parameters)` | dynamic, no controls |
+
+Each class carries three boolean flags (`is_dynamic`, `has_tv_controls`, `has_ti_controls`) that `initialize()` reads directly — replacing the integer `_simulate_signature` and the `_handle_simulate_sig` sniffing entirely.
+
+**Backward compatibility:** A private `_LegacySimulatorAdapter` wraps bare callables using the old sniffing logic, emitting a `DeprecationWarning`. The existing `designer.simulate = my_function` pattern keeps working via a deprecated property alias on `Designer`. No example changes are needed during PR 1.
+
+### Tasks
+
+**PR 1 — Interface + shim (no example changes):**
+- [ ] Create `pydex/core/simulate.py` with `SimulatorBase` and 5 named subclasses
+- [ ] Add `_LegacySimulatorAdapter` (private, wraps bare callables with deprecation warning)
+- [ ] Add `simulator` property to `Designer`; deprecate `simulate` as alias
+- [ ] Replace `_handle_simulate_sig` + `_initialize_internal_simulate_function` with `_configure_simulator()` in `_mixin_init.py`
+- [ ] Rewrite `_get_component_sizes` to use the three boolean flags instead of integer `_simulate_signature`
+- [ ] Update `_swap_candidates` / `_revert_candidates` in `_mixin_criteria.py` to use `_go_simulator`
+- [ ] Make `_simulate_internal` a thin delegating method in `_mixin_sensitivity.py`
+- [ ] Export the 5 public classes from `pydex/core/__init__.py`
+- [ ] Verify all 6 runnable examples pass (with deprecation warnings, no failures)
+
+**PR 2 — Migrate examples to named classes:**
+- [ ] Update all examples in `examples/` to use the appropriate named simulator class
+- [ ] Remove `DesignerInit.simulate` stub (no longer needed once all examples migrated)
+- [ ] Write `MIGRATION.md` with before/after for each of the 5 signature types
+
+**Definition of done:** All examples use named simulator classes. `_LegacySimulatorAdapter` still exists but is never invoked by any shipped example. mypy catches a wrong `simulate()` signature at type-check time.
 
 ---
 
@@ -130,4 +149,4 @@ To be planned after Phases 1–6. Candidates (from original `pydex_todo.docx` an
 - **Each phase is independently deployable** — don't hold a release waiting for phase N+1
 - **No breaking the public API without a deprecation cycle**
 - **Tests before refactor** — if a method has no test, write one before touching it
-- **One concern per module** — if you can't name a module's single responsibility in 5 words, it's doing too much
+- **One concern per module** — if I can't name a module's single responsibility in 5 words, it's doing too much

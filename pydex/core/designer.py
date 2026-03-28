@@ -37,6 +37,7 @@ from pydex.core._mixin_estimation import DesignerEstimation
 from pydex.core._mixin_sensitivity import DesignerSensitivity
 from pydex.core._mixin_candidates import DesignerCandidates
 from pydex.core._mixin_init import DesignerInit
+from pydex.core.simulate import SimulatorBase, _LegacySimulatorAdapter
 import matplotlib
 import cvxpy as cp
 import numdifftools as nd
@@ -90,7 +91,8 @@ class Designer(DesignerIO, DesignerCriteria, DesignerVisualization, DesignerAppo
         self.n_r_go: int = 0
         self._candidates_swapped: bool = False
 
-        self.go_simulate: Callable[..., NDArray[np.float64]] | None = None
+        self._simulator: SimulatorBase | Callable[..., Any] | None = None
+        self._go_simulator: SimulatorBase | None = None
         self.go_tic: NDArray[np.float64] | None = None
         self.go_tvc: Any = None
         self.go_spt: NDArray[np.float64] | None = None
@@ -172,7 +174,7 @@ class Designer(DesignerIO, DesignerCriteria, DesignerVisualization, DesignerAppo
         self._ticc: Any = None
         self._sptc: Any = None
         self._model_parameters: Any = None
-        self._simulate_signature: int = 0
+        self._simulate_signature: int = 0  # retained for _get_component_sizes; removed in Phase 3 cleanup
 
         # optional user inputs
         self.measurable_responses: Any = None  # subset of measurable states
@@ -296,6 +298,45 @@ class Designer(DesignerIO, DesignerCriteria, DesignerVisualization, DesignerAppo
         """ discrete design options """
         self._discrete_design_solver = None
         self._MIP_solver = None
+
+    @property
+    def simulator(self) -> SimulatorBase | None:
+        """The simulator attached to this designer."""
+        if isinstance(self._simulator, SimulatorBase):
+            return self._simulator
+        return None
+
+    @simulator.setter
+    def simulator(self, value: Any) -> None:
+        if value is None or isinstance(value, SimulatorBase):
+            self._simulator = value
+        elif callable(value):
+            self._simulator = value  # raw callable; wrapped in _configure_simulator()
+        else:
+            raise TypeError(
+                f"simulator must be a SimulatorBase instance or a callable, got {type(value)}"
+            )
+
+    @property
+    def simulate(self) -> Any:
+        """Deprecated. Use designer.simulator instead."""
+        import warnings
+        warnings.warn(
+            "designer.simulate is deprecated, use designer.simulator",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self._simulator
+
+    @simulate.setter
+    def simulate(self, value: Any) -> None:
+        import warnings
+        warnings.warn(
+            "Assigning to designer.simulate is deprecated, use designer.simulator",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        self.simulator = value
 
     def solve_cvar_problem(self, criterion, beta, n_spt=None, n_exp=None,
                            optimize_sampling_times=False, package="cvxpy",

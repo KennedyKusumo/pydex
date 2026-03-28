@@ -38,8 +38,8 @@ if TYPE_CHECKING:
     sensitivities: Any
     go_sensitivities: Any
     go_sample_sensitivities_done: bool
-    go_simulate: Any
-    simulate: Any
+    _go_simulator: Any
+    _simulator: Any
     error_cov: Any
     go_error_cov: Any
 
@@ -196,7 +196,7 @@ class DesignerCriteria:
         self.n_tic, self.n_tic_go = self.n_tic_go, self.n_tic
         self.n_r, self.n_r_go = self.n_r_go, self.n_r
         self.n_spt, self.n_spt_go = self.n_spt_go, self.n_spt
-        self.simulate, self.go_simulate = self.go_simulate, self.simulate  # type: ignore[method-assign, assignment]
+        self._simulator, self._go_simulator = self._go_simulator, self._simulator
         self.go_sensitivities, self.sensitivities = self.sensitivities, self.go_sensitivities
         self.error_cov, self.go_error_cov = self.go_error_cov, self.error_cov
         self.initialize(verbose=self._verbose)
@@ -208,8 +208,8 @@ class DesignerCriteria:
         self.spt_controls_candidates = self.old_tic_cands  # type: ignore[attr-defined]
 
         self.sensitivities = self.old_sensitivities  # type: ignore[attr-defined]
-        if self.go_simulate:
-            self.simulate, self.go_simulate = self.go_simulate, self.simulate  # type: ignore[method-assign, assignment]
+        if self._go_simulator:
+            self._simulator, self._go_simulator = self._go_simulator, self._simulator
         self.initialize(verbose=0)
 
         self._model_parameters_changed = False

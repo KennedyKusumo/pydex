@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 import cvxpy as cp
 import numpy as np
 from numpy.typing import NDArray
+from pydex.core.simulate import SimulatorBase, _LegacySimulatorAdapter
 
 if TYPE_CHECKING:
     _verbose: int
@@ -121,10 +122,6 @@ class DesignerInit:
             frame = frame.f_back
         return False
 
-    """ user-defined methods: must be overwritten by user to work """
-    def simulate(self, *args: Any) -> NDArray[np.float64]:
-        raise SyntaxError("Don't forget to specify the simulate function.")
-
     """ core activity interfaces """
     def initialize(self, verbose: int = 0, memory_threshold: int = int(1e9)) -> str:
         """ check for syntax errors, runs one simulation to determine n_r """
@@ -132,7 +129,7 @@ class DesignerInit:
         """ check if simulate function has been specified """
         self._data_type_check()
         self._check_stats_framework()
-        self._handle_simulate_sig()
+        self._configure_simulator()
         self._get_component_sizes()
         self._check_candidate_lengths()
         self._check_missing_components()
@@ -412,37 +409,54 @@ class DesignerInit:
                     raise SyntaxError("tv_controls_candidates must be supplied as a "
                                       "numpy array.")
 
-    def _handle_simulate_sig(self):
+    def _configure_simulator(self):
         """
-        Determines type of model from simulate signature. Five supported types:
-        =================================================================================
-        1. simulate(ti_controls, model_parameters).
-        2. simulate(ti_controls, sampling_times, model_parameters).
-        3. simulate(tv_controls, sampling_times, model_parameters).
-        4. simulate(ti_controls, tv_controls, sampling_times, model_parameters).
-        5. simulate(sampling_times, model_parameters).
-        =================================================================================
-        If a pyomo.dae model is specified a special signature is recommended that adds
-        two input arguments to the beginning of the simulate signatures e.g., for type 3:
-        simulate(model, simulator, tv_controls, sampling_times, model_parameters).
-        """
-        sim_sig = list(signature(self.simulate).parameters.keys())
-        unspecified_sig = ["unspecified"]
-        if np.all([entry in sim_sig for entry in unspecified_sig]):
-            raise SyntaxError("Don't forget to specify the simulate function.")
+        Configures the internal simulator, setting system-type flags.
 
+        If a SimulatorBase instance is attached, reads flags directly from it.
+        If a plain callable is attached (legacy), sniffs its argument names,
+        wraps it in _LegacySimulatorAdapter (emits DeprecationWarning), and
+        sets _simulate_signature for _get_component_sizes compatibility.
+        """
+        sim = self._simulator
+
+        if sim is None:
+            raise SyntaxError(
+                "No simulator specified. Assign one via designer.simulator = <SimulatorBase> "
+                "or the legacy designer.simulate = <callable>."
+            )
+
+        if isinstance(sim, SimulatorBase):
+            # new-style: read flags directly, no sniffing needed
+            self._dynamic_system = sim.is_dynamic
+            self._dynamic_controls = sim.has_tv_controls
+            self._invariant_controls = sim.has_ti_controls
+            # derive _simulate_signature for _get_component_sizes
+            if not sim.is_dynamic and sim.has_ti_controls:
+                self._simulate_signature = 1
+            elif sim.is_dynamic and sim.has_ti_controls and not sim.has_tv_controls:
+                self._simulate_signature = 2
+            elif sim.is_dynamic and sim.has_tv_controls and not sim.has_ti_controls:
+                self._simulate_signature = 3
+            elif sim.is_dynamic and sim.has_ti_controls and sim.has_tv_controls:
+                self._simulate_signature = 4
+            else:
+                self._simulate_signature = 5
+            return
+
+        # legacy path: plain callable — sniff signature and wrap
+        sim_sig = list(signature(sim).parameters.keys())
         t1_sig = ["ti_controls"]
         t2_sig = ["ti_controls", "sampling_times"]
         t3_sig = ["tv_controls", "sampling_times"]
         t4_sig = ["ti_controls", "tv_controls", "sampling_times"]
         t5_sig = ["sampling_times"]
-        # initialize simulate id
+
         self._simulate_signature = 0
-        # check if model_parameters is present
         if "model_parameters" not in sim_sig:
             raise SyntaxError(
-                f"The input argument \"model_parameters\" is not found in the simulate "
-                f"function, please fix simulate signature."
+                'The input argument "model_parameters" is not found in the simulate '
+                'function, please fix simulate signature.'
             )
         if np.all([entry in sim_sig for entry in t4_sig]):
             self._simulate_signature = 4
@@ -473,13 +487,12 @@ class DesignerInit:
             raise SyntaxError(
                 "Unrecognized simulate function signature, please check if you have "
                 "specified it correctly. The base signature requires "
-                "'model_parameters'. Adding 'sampling_times' makes it dynamic,"
-                "adding 'tv_controls' and 'sampling_times' makes a dynamic system with"
-                " time-varying controls. Adding 'tv_controls' without 'sampling_times' "
-                "does not work. Adding 'model' and 'simulator' makes it a pyomo "
-                "simulate signature. 'ti_controls' are optional in all cases."
+                "'model_parameters'. Adding 'sampling_times' makes it dynamic, "
+                "adding 'tv_controls' and 'sampling_times' makes a dynamic system with "
+                "time-varying controls. Adding 'tv_controls' without 'sampling_times' "
+                "does not work. 'ti_controls' are optional in all cases."
             )
-        self._initialize_internal_simulate_function()
+        self._simulator = _LegacySimulatorAdapter(sim, self._simulate_signature)
 
     def _check_stats_framework(self):
         """ check if local or Pseudo-bayesian designs """
