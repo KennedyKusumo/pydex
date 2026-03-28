@@ -1,56 +1,90 @@
+from __future__ import annotations
+
 from matplotlib import pyplot as plt
+from matplotlib.figure import Figure
 from matplotlib.gridspec import GridSpec
 import numpy as np
+from numpy.typing import NDArray
+from typing import Any
 
 
 class DynamicPlotter:
-    def __init__(self):
-        self.tic = None
-        self.tvc = None
-        self.effort = None
-        self.figs = []
-        self.axes = []
-        self.n_sups = None
-        self.n_cols = None
-        self.n_ti = None
-        self.n_tv = None
-        self.ti_xlim = None
-        self.ti_ylim = None
-        self.tv_xlim = None
-        self.tv_ylim = None
-        self.width_ratios = None
-        self.ti_xticks = None
-        self.ti_xticklabels = None
-        self.ti_yticks = None
-        self.ti_yticklabels = None
-        self.tv_xticks = None
-        self.tv_xticklabels = None
-        self.tv_yticks = None
-        self.tv_yticklabels = None
-        self.ti_names = None
-        self.tv_names = None
-        self.fig_title = None
-        self.fig_size = None
+    def __init__(self) -> None:
+        self.tic: NDArray[np.float64] | None = None
+        self.tvc: Any | None = None  # array of dicts for time-varying controls
+        self.effort: NDArray[np.float64] | None = None
+        self.figs: list[Figure] = []
+        self.axes: Any = []
+        self.n_sups: int = 0
+        self.n_cols: int = 0
+        self.n_ti: int = 0
+        self.n_tv: int = 0
+        self.ti_xlim: NDArray[np.float64] | None = None
+        self.ti_ylim: NDArray[np.float64] | None = None
+        self.tv_xlim: NDArray[np.float64] | None = None
+        self.tv_ylim: NDArray[np.float64] | None = None
+        self.width_ratios: list[float] | None = None
+        self.ti_xticks: list[Any] | None = None
+        self.ti_xticklabels: list[Any] | None = None
+        self.ti_yticks: list[Any] | None = None
+        self.ti_yticklabels: list[Any] | None = None
+        self.tv_xticks: list[Any] | None = None
+        self.tv_xticklabels: list[Any] | None = None
+        self.tv_yticks: list[Any] | None = None
+        self.tv_yticklabels: list[Any] | None = None
+        self.ti_names: list[str] | None = None
+        self.tv_names: list[str] | None = None
+        self.fig_title: str | None = None
+        self.fig_size: tuple[float, float] | None = None
 
-    def determine_n_sups(self):
-        self.n_sups = self.effort.shape[0]
+    def determine_n_sups(self) -> None:
+        assert self.effort is not None, "effort must be set before calling plot()"
+        effort = self.effort
+        self.n_sups = effort.shape[0]
 
-    def determine_n_cols(self):
-        self.n_ti = self.tic.shape[1]
-        self.n_tv = self.tvc.shape[1]
+    def determine_n_cols(self) -> None:
+        assert self.tic is not None, "tic must be set before calling plot()"
+        assert self.tvc is not None, "tvc must be set before calling plot()"
+        tic, tvc = self.tic, self.tvc
+        self.n_ti = tic.shape[1]
+        self.n_tv = tvc.shape[1]
         self.n_cols = self.n_ti + self.n_tv
         self.n_cols += 1
 
-    def determine_n_ti_n_tv(self):
-        self.n_ti = self.tic.shape[1]
-        self.n_tv = self.tvc.shape[1]
+    def determine_n_ti_n_tv(self) -> None:
+        assert self.tic is not None, "tic must be set before calling determine_n_ti_n_tv()"
+        assert self.tvc is not None, "tvc must be set before calling determine_n_ti_n_tv()"
+        tic, tvc = self.tic, self.tvc
+        self.n_ti = tic.shape[1]
+        self.n_tv = tvc.shape[1]
 
-    def plot(self):
+    def plot(self) -> Figure:
         self.determine_n_sups()
         self.determine_n_cols()
 
-        fig = plt.figure(figsize=self.fig_size)
-        fig.suptitle(self.fig_title)
+        assert self.tic is not None
+        assert self.tvc is not None
+        assert self.effort is not None
+        tic_data, tvc_data, effort_data = self.tic, self.tvc, self.effort
+
+        ti_names = self.ti_names
+        tv_names = self.tv_names
+        ti_xlim = self.ti_xlim
+        ti_ylim = self.ti_ylim
+        ti_xticks = self.ti_xticks
+        ti_yticks = self.ti_yticks
+        ti_xticklabels = self.ti_xticklabels
+        ti_yticklabels = self.ti_yticklabels
+        tv_xlim = self.tv_xlim
+        tv_ylim = self.tv_ylim
+        tv_xticks = self.tv_xticks
+        tv_yticks = self.tv_yticks
+        tv_xticklabels = self.tv_xticklabels
+        tv_yticklabels = self.tv_yticklabels
+
+        fig: Figure = plt.figure(figsize=self.fig_size)
+        if self.fig_title is not None:
+            fig.suptitle(self.fig_title)
         if self.n_cols < 10:
             axes_pos = self.n_sups * 100 + self.n_cols * 10
         else:
@@ -73,13 +107,13 @@ class DynamicPlotter:
         # add variable names
         for j in range(self.n_cols):
             if j < self.n_ti:
-                self.axes[0, j].set_title(self.ti_names[j])
+                self.axes[0, j].set_title(ti_names[j] if ti_names else "")
             elif self.n_ti <= j < self.n_ti + self.n_tv:
-                self.axes[0, j].set_title(self.tv_names[j - self.n_ti])
+                self.axes[0, j].set_title(tv_names[j - self.n_ti] if tv_names else "")
             else:
                 self.axes[0, j].set_title("Efforts")
 
-        for i, (tic, tvc) in enumerate(zip(self.tic, self.tvc)):
+        for i, (tic, tvc) in enumerate(zip(tic_data, tvc_data)):
             # TIC
             for j_ti, ti in enumerate(tic):
                 self.axes[i, j_ti].plot(
@@ -144,26 +178,38 @@ class DynamicPlotter:
 
             # effort
             self.axes[i, self.n_ti + self.n_tv].annotate(
-                text=f"{effort[i] * 100:.2f}%",
+                text=f"{effort_data[i] * 100:.2f}%",
                 xy=(0.10, 0.10 + 0.45),
             )
         for i, ax in enumerate(self.axes):
             for j, a in enumerate(ax):
                 if j < self.n_ti:
-                    a.set_xlim(self.ti_xlim[j])
-                    a.set_ylim(self.ti_ylim[j])
-                    a.get_xaxis().set_ticks(self.ti_xticks[j])
-                    a.get_yaxis().set_ticks(self.ti_yticks[j])
-                    a.get_xaxis().set_ticklabels(self.ti_xticklabels[j])
-                    a.get_yaxis().set_ticklabels(self.ti_yticklabels[j])
+                    if ti_xlim is not None:
+                        a.set_xlim(ti_xlim[j])
+                    if ti_ylim is not None:
+                        a.set_ylim(ti_ylim[j])
+                    if ti_xticks is not None:
+                        a.get_xaxis().set_ticks(ti_xticks[j])
+                    if ti_yticks is not None:
+                        a.get_yaxis().set_ticks(ti_yticks[j])
+                    if ti_xticklabels is not None:
+                        a.get_xaxis().set_ticklabels(ti_xticklabels[j])
+                    if ti_yticklabels is not None:
+                        a.get_yaxis().set_ticklabels(ti_yticklabels[j])
 
                 elif self.n_ti <= j < self.n_ti + self.n_tv:
-                    a.set_xlim(self.tv_xlim[j - self.n_ti])
-                    a.set_ylim(self.tv_ylim[j - self.n_ti])
-                    a.get_xaxis().set_ticks(self.tv_xticks[j - self.n_ti])
-                    a.get_yaxis().set_ticks(self.tv_yticks[j - self.n_ti])
-                    a.get_xaxis().set_ticklabels(self.tv_xticklabels[j - self.n_ti])
-                    a.get_yaxis().set_ticklabels(self.tv_yticklabels[j - self.n_ti])
+                    if tv_xlim is not None:
+                        a.set_xlim(tv_xlim[j - self.n_ti])
+                    if tv_ylim is not None:
+                        a.set_ylim(tv_ylim[j - self.n_ti])
+                    if tv_xticks is not None:
+                        a.get_xaxis().set_ticks(tv_xticks[j - self.n_ti])
+                    if tv_yticks is not None:
+                        a.get_yaxis().set_ticks(tv_yticks[j - self.n_ti])
+                    if tv_xticklabels is not None:
+                        a.get_xaxis().set_ticklabels(tv_xticklabels[j - self.n_ti])
+                    if tv_yticklabels is not None:
+                        a.get_yaxis().set_ticklabels(tv_yticklabels[j - self.n_ti])
                 else:
                     a.set_xlim([0, 1])
                     a.set_ylim([0, 1])

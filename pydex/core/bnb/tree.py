@@ -1,24 +1,29 @@
+from __future__ import annotations
+
 from time import time
+
 import numpy as np
 
+from pydex.core.bnb.node import Node
 
-class Tree(object):
-    def __init__(self, root_node):
-        self.active_nodes = [root_node]
+
+class Tree:
+    def __init__(self, root_node: Node) -> None:
+        self.active_nodes: list[Node] = [root_node]
         # end-point nodes
-        self.integral_nodes = []
-        self.infeasible_nodes = []
+        self.integral_nodes: list[Node] = []
+        self.infeasible_nodes: list[Node] = []
 
-        self.selected_node = None
-        self.optimal_node = None
+        self.selected_node: Node | None = None
+        self.optimal_node: Node | None = None
 
-        self.ub = None
-        self.lb = None
+        self.ub: float | None = None
+        self.lb: float | None = None
 
-        self.finished = None
-        self._verbose = 0
+        self.finished: bool = False
+        self._verbose: int = 0
 
-    def solve(self):
+    def solve(self) -> Node | None:
         start = time()
         iteration = 1
         print(f"[Branch and Bound]".center(100, "="))
@@ -32,10 +37,12 @@ class Tree(object):
             if not self.active_nodes:
                 self.finished = True
                 for node in self.integral_nodes:
-                    if self.ub <= node.ub:
+                    assert node.ub is not None
+                    if self.ub is None or self.ub <= node.ub:
                         self.ub = node.ub
                         self.optimal_node = node
-                    return self.optimal_node
+                        return self.optimal_node
+                return self.optimal_node
 
             # solve active nodes (nodes are smart to not re-solve when already solved)
             for node in self.active_nodes:
@@ -62,26 +69,30 @@ class Tree(object):
             # select most promising active node
             if self.active_nodes:
                 self.selected_node = self.active_nodes[
-                    np.argmax([node.ub for node in self.active_nodes])
+                    np.argmax([node.ub for node in self.active_nodes])  # type: ignore[arg-type]
                 ]
             else:
                 self.selected_node = self.integral_nodes[
-                    np.argmax([node.ub for node in self.integral_nodes])
+                    np.argmax([node.ub for node in self.integral_nodes])  # type: ignore[arg-type]
                 ]
 
+            assert self.selected_node is not None
             if self._verbose >= 2:
                 print(f"Complete in {time() - iter_start_time:.2f} CPU seconds.")
                 print(f"".center(100, "."))
                 print(f"# of active nodes       : {len(self.active_nodes)}")
                 print(f"# of integral nodes     : {len(self.integral_nodes)}")
                 print(f"# of infeasible nodes   : {len(self.infeasible_nodes)}")
-                print(f"Tightest upper bound    : {np.max(self.selected_node.ub)}")
+                print(f"Tightest upper bound    : {self.selected_node.ub}")
                 if len(self.integral_nodes) != 0:
-                    print(f"Best integer solution   : {np.nanmax([node.ub for node in self.integral_nodes])}")
+                    ubs = [node.ub for node in self.integral_nodes if node.ub is not None]
+                    print(f"Best integer solution   : {max(ubs) if ubs else 'n/a'}")
 
             # check if there exist an integral node better than most promising node
             # terminate if yes, with said integral node being optimal.
+            assert self.selected_node.ub is not None
             for node in self.integral_nodes:
+                assert node.ub is not None
                 if node.ub >= self.selected_node.ub:
                     print("".center(100, "-"))
                     print(
@@ -102,3 +113,5 @@ class Tree(object):
             self.active_nodes.remove(self.selected_node)
 
             iteration += 1
+
+        return self.optimal_node
