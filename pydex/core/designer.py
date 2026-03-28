@@ -1367,7 +1367,16 @@ class Designer(DesignerIO, DesignerCriteria, DesignerVisualization):
                           regularize_fim: bool = False, beta: float = 0.90,
                           min_expected_value: float | None = None,
                           fix_effort: NDArray[np.float64] | None = None,
-                          save_atomics: bool = False, **kwargs: Any) -> Any:
+                          save_atomics: bool = False,
+                          discrete_design_solver: str | None = None,
+                          assess_potential_gain: bool = False,
+                          atol: float | None = None,
+                          rtol: float = 1e-3,
+                          draw_progress: bool = True,
+                          singular_tol: float | None = None,
+                          max_iters: float = 1e5,
+                          MIP_solver: str | None = None,
+                          **kwargs: Any) -> Any:
         # storing user choices
         self._regularize_fim = regularize_fim
         self._optimization_package = package
@@ -1474,7 +1483,7 @@ class Designer(DesignerIO, DesignerCriteria, DesignerVisualization):
                 opt_options = {"disp": opt_verbose}
         if self._optimization_package == "cvxpy":
             if optimizer is None:
-                self._optimizer = "MOSEK"
+                self._optimizer = None  # let cvxpy auto-select from installed solvers
 
         """ deal with unconstrained form """
         if self._optimization_package == "scipy":
@@ -1691,7 +1700,7 @@ class Designer(DesignerIO, DesignerCriteria, DesignerVisualization):
                 f"Complete: \n"
                 f" ~ sensitivity analysis took {self._sensitivity_analysis_time:.2f} "
                 f"CPU seconds.\n"
-                f" ~ optimization with {self._optimizer:s} via "
+                f" ~ optimization with {self._optimizer!s} via "
                 f"{self._optimization_package} took "
                 f"{self._optimization_time:.2f} CPU seconds."
             )
@@ -3179,7 +3188,7 @@ class Designer(DesignerIO, DesignerCriteria, DesignerVisualization):
             self._current_scr_mp = self.model_parameters
 
         # number of responses
-        if self.n_r is None:
+        if self.n_r == 0:
             if self._verbose >= 3:
                 print(
                     "Running one simulation for initialization "
