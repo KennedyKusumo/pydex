@@ -4,3 +4,37 @@ requires = [
     "wheel"
 ]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "pydex"
+version = "0.0.9"
+description = "A Python package for optimal experiment design."
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Kennedy Putra Kusumo", email = "kennedy.putra.kusumo@gmail.com"},
+    {name = "Salvador Garcia-Munoz"},
+]
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "numpy",
+    "scipy",
+    "matplotlib",
+    "numdifftools",
+    "cvxpy",
+    "dill",
+    "corner",
+    "emcee",
+]
+
+[project.optional-dependencies]
+ipopt = ["cyipopt"]
+
+[project.urls]
+Homepage = "https://github.com/KennedyPutraKusumo/pydex"
+Fork = "https://github.com/salvadorgarciamunoz/pydex"

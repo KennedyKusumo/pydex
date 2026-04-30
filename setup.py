@@ -1,32 +1,14 @@
-import setuptools
+"""
+setup.py
+--------
+Minimal setup stub — all package metadata is defined in pyproject.toml.
 
-with open("README.md", "r") as fh:
-    long_description = fh.read()
+This file exists for backwards compatibility with older pip versions
+(< 21.3) that do not support PEP 517/518 builds from pyproject.toml alone.
+For modern pip, pyproject.toml is the authoritative source of all metadata
+including name, version, author, dependencies, and classifiers.
+"""
 
-setuptools.setup(
-    name="pydex",
-    version="0.0.9",
-    author="Kennedy Putra Kusumo",
-    author_email="kennedy.putra.kusumo@gmail.com",
-    description="A Python package for optimal experiment design.",
-    long_description=long_description,
-    long_description_content_type="text/markdown",
-    url="https://github.com/KennedyPutraKusumo/pydex",
-    packages=setuptools.find_packages(),
-    classifiers=[
-        "Programming Language :: Python :: 3",
-        "License :: OSI Approved :: MIT License",
-        "Operating System :: OS Independent",
-    ],
-    python_requires='>=3.6',
-    install_requires=[
-        'matplotlib',
-        'numdifftools',
-        'scipy',
-        'cvxpy',
-        'dill',
-        'numpy',
-        'corner',
-        'emcee',
-    ],
-)
+from setuptools import setup
+
+setup()
